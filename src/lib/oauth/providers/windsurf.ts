@@ -3,18 +3,18 @@ import { WINDSURF_CONFIG } from "../constants/oauth";
 /**
  * Windsurf / Devin CLI OAuth Provider
  *
- * Uses PKCE Authorization Code Flow — same pattern as Codex CLI.
- * Extracted from Devin CLI binary (devin.exe string analysis):
+ * Uses PKCE Authorization Code Flow — confirmed from live devin auth login traffic.
  *
  *   1. OmniRoute starts a local callback server (random port, 127.0.0.1)
  *   2. Browser opens:
- *        https://windsurf.com/editor/signin
- *          ?response_type=code
- *          &redirect_uri=http://127.0.0.1:PORT/auth/callback
+ *        https://app.devin.ai/auth/cli/continue
+ *          ?redirect_uri=http://127.0.0.1:PORT/callback
+ *          &state=<STATE>
+ *          &prompt=select_account
  *          &code_challenge=<S256_CHALLENGE>
  *          &code_challenge_method=S256
- *   3. User logs in (Google / GitHub / Windsurf Enterprise)
- *   4. Browser redirects back to callback server with `code`
+ *   3. User logs in (Google / GitHub / Windsurf account)
+ *   4. Browser redirects back to callback server with `code` + `state`
  *   5. Exchange code via Windsurf Connect JSON:
  *        POST https://server.codeium.com/exa.seat_management_pb.SeatManagementService/ExchangePKCEAuthorizationCode
  *        { "code": "...", "codeVerifier": "...", "redirectUri": "..." }
@@ -27,7 +27,7 @@ import { WINDSURF_CONFIG } from "../constants/oauth";
 export const windsurf = {
   config: WINDSURF_CONFIG,
   flowType: "authorization_code_pkce",
-  // Fixed callback path expected by Devin CLI auth flow
+  // Callback path used by Devin CLI: /callback (not /auth/callback)
   callbackPath: WINDSURF_CONFIG.callbackPath,
   // Port 0 = OS assigns a free port (we use the globalThis devin callback state)
   callbackPort: WINDSURF_CONFIG.callbackPort,
@@ -39,11 +39,11 @@ export const windsurf = {
     codeChallenge: string
   ) => {
     const params = new URLSearchParams({
-      response_type: "code",
       redirect_uri: redirectUri,
+      state,
+      prompt: "select_account",
       code_challenge: codeChallenge,
       code_challenge_method: config.codeChallengeMethod,
-      state,
     });
     return `${config.authorizeUrl}?${params.toString()}`;
   },

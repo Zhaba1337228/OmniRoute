@@ -390,10 +390,10 @@ export default function OAuthModal({
       if (provider === "codex" || provider === "openai") {
         redirectUri = "http://localhost:1455/auth/callback";
       } else if (provider === "windsurf" || provider === "devin-cli") {
-        // Remote fallback: use OmniRoute's port with the /auth/callback path Windsurf expects.
+        // Remote fallback: Devin CLI uses /callback (not /auth/callback).
         // On true localhost this code is never reached (callback server handles the flow above).
         const port = window.location.port || "20128";
-        redirectUri = `http://localhost:${port}/auth/callback`;
+        redirectUri = `http://localhost:${port}/callback`;
       } else if (GOOGLE_OAUTH_PROVIDERS.has(provider)) {
         // Google OAuth built-in credentials only accept localhost redirect URIs.
         // Even in remote deployments we use localhost — user copies the callback URL manually.
