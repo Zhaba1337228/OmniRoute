@@ -246,11 +246,38 @@ export default function OAuthModal({
     [provider, onSuccess, reauthConnection]
   );
 
+  // Auto-import Devin CLI credentials from credentials.toml (written by `devin auth login`)
+  const handleDevinAutoImport = useCallback(async () => {
+    setError(null);
+    setSavingToken(true);
+    try {
+      const res = await fetch(`/api/oauth/devin-cli/auto-import`);
+      const data = await res.json();
+      if (data.found && (data.imported || data.duplicate)) {
+        setStep("success");
+        onSuccess?.();
+        return;
+      }
+      setError(data.error || "Credentials not found. Run `devin auth login` first.");
+    } catch (err: any) {
+      setError(err.message || "Auto-import failed");
+    } finally {
+      setSavingToken(false);
+    }
+  }, [onSuccess]);
+
   // Start OAuth flow
   const startOAuthFlow = useCallback(async () => {
     if (!provider) return;
     try {
       setError(null);
+
+      // Devin CLI: can't use PKCE through OmniRoute (redirect_uri must match what CLI registers).
+      // Instead show instructions to run `devin auth login` and use auto-import.
+      if (provider === "devin-cli") {
+        setStep("input");
+        return;
+      }
 
       // Device code flow (GitHub, Qwen, Kiro, Kimi Coding, KiloCode)
       if (
@@ -783,8 +810,49 @@ export default function OAuthModal({
               </>
             )}
 
+            {/* Devin CLI — auto-import from credentials.toml */}
+            {step === "input" && !isDeviceCode && provider === "devin-cli" && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-sm text-blue-200 space-y-2">
+                  <p className="font-semibold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]">terminal</span>
+                    Run in your terminal first:
+                  </p>
+                  <code className="block bg-black/30 rounded px-3 py-2 font-mono text-xs text-green-300 select-all">
+                    devin auth login
+                  </code>
+                  <p className="text-xs text-blue-300">
+                    Complete the login in the browser that opens, then click Import below.
+                  </p>
+                </div>
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                <div className="flex gap-2">
+                  <Button onClick={handleDevinAutoImport} fullWidth disabled={savingToken}>
+                    <span className="material-symbols-outlined text-[16px] mr-1">
+                      {savingToken ? "progress_activity" : "download"}
+                    </span>
+                    {savingToken ? "Importing…" : "Import credentials"}
+                  </Button>
+                  <Button onClick={onClose} variant="ghost" fullWidth>
+                    Cancel
+                  </Button>
+                </div>
+                <p className="text-xs text-text-muted text-center">
+                  Or paste your API key from{" "}
+                  <a
+                    href="https://windsurf.com/show-auth-token"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    windsurf.com/show-auth-token
+                  </a>
+                </p>
+              </div>
+            )}
+
             {/* Manual Input Step */}
-            {step === "input" && !isDeviceCode && (
+            {step === "input" && !isDeviceCode && provider !== "devin-cli" && (
               <>
                 <div className="space-y-4">
                   {/* Remote/LAN server info for Google OAuth providers */}
