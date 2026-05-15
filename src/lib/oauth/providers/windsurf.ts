@@ -8,7 +8,7 @@ import { WINDSURF_CONFIG } from "../constants/oauth";
  *
  *   1. OmniRoute starts a local callback server (random port, 127.0.0.1)
  *   2. Browser opens:
- *        https://app.devin.ai/editor/signin
+ *        https://windsurf.com/editor/signin
  *          ?response_type=code
  *          &redirect_uri=http://127.0.0.1:PORT/auth/callback
  *          &code_challenge=<S256_CHALLENGE>

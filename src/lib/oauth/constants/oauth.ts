@@ -269,7 +269,9 @@ export const CURSOR_CONFIG = {
 // Authentication uses PKCE Authorization Code Flow — same pattern as Codex CLI.
 // Extracted from Devin CLI binary (model_configs_v2.bin + devin.exe strings):
 //
-//   Authorize URL:  https://app.devin.ai/editor/signin
+//   Authorize URL:  https://windsurf.com/editor/signin
+//                   (NOT app.devin.ai/editor/signin — that path 404s in the Devin SPA;
+//                    windsurf.com/editor/signin is the real OAuth sign-in page)
 //   Params:         response_type=code, redirect_uri, code_challenge, code_challenge_method=S256
 //   Callback path:  /auth/callback  (local server on random port 127.0.0.1:0)
 //   Exchange:       POST https://server.codeium.com/<ExchangePKCEAuthorizationCode>
@@ -278,8 +280,9 @@ export const CURSOR_CONFIG = {
 //
 // Fallback: user can also paste a token from windsurf.com/show-auth-token
 export const WINDSURF_CONFIG = {
-  // Browser-based PKCE authorize endpoint (extracted from devin.exe binary)
-  authorizeUrl: "https://app.devin.ai/editor/signin",
+  // Browser-based PKCE authorize endpoint — windsurf.com/editor/signin is the real sign-in page.
+  // app.devin.ai/editor/signin is a Devin SPA that has no /editor/signin route → React Router 404.
+  authorizeUrl: "https://windsurf.com/editor/signin",
   codeChallengeMethod: "S256" as const,
   // Local callback server — 0 = OS assigns a free port
   callbackPort: 0,

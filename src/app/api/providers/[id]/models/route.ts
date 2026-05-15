@@ -1554,6 +1554,105 @@ export async function GET(
       }
     }
 
+    if (provider === "windsurf" || provider === "devin-cli") {
+      const cachedResponse = maybeReturnCachedDiscovery();
+      if (cachedResponse) return cachedResponse;
+
+      const autoFetchDisabledResponse = maybeReturnAutoFetchDisabled();
+      if (autoFetchDisabledResponse) return autoFetchDisabledResponse;
+
+      const token = accessToken || apiKey;
+      if (!token) {
+        const fallback = buildLocalCatalogResponse(
+          "No Windsurf API key — using local catalog. Connect via OAuth or paste a token to enable live sync."
+        );
+        if (fallback) return fallback;
+        return NextResponse.json({ error: "No credentials" }, { status: 401 });
+      }
+
+      try {
+        const wsApiUrl =
+          "https://server.codeium.com/exa.api_server_pb.ApiServerService/GetCliModelConfigs";
+        const wsRes = await safeOutboundFetch(wsApiUrl, {
+          ...SAFE_OUTBOUND_FETCH_PRESETS.modelsDiscovery,
+          guard: getProviderOutboundGuard(),
+          proxyConfig: proxy,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "Connect-Protocol-Version": "1",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            metadata: {
+              api_key: token,
+              ide_name: "windsurf",
+              ide_version: "3.14.0",
+              extension_version: "3.14.0",
+              locale: "en-US",
+            },
+          }),
+        });
+
+        if (!wsRes.ok) {
+          console.log(`[models] ${provider}: GetCliModelConfigs failed ${wsRes.status}`);
+          const fallback = buildDiscoveryFallbackResponse({
+            cacheWarning: `Windsurf API unavailable (${wsRes.status}) — using cached catalog`,
+            localWarning: `Windsurf API unavailable (${wsRes.status}) — using local catalog`,
+          });
+          if (fallback) return fallback;
+          return NextResponse.json(
+            { error: `Failed to fetch Windsurf models: ${wsRes.status}` },
+            { status: 502 }
+          );
+        }
+
+        const wsData = await wsRes.json();
+        const configs: Array<Record<string, unknown>> = Array.isArray(wsData.clientModelConfigs)
+          ? (wsData.clientModelConfigs as Array<Record<string, unknown>>)
+          : [];
+
+        // Filter out disabled models and map to OmniRoute model format.
+        // modelUid uses dash-notation (e.g. "swe-1-6-fast"); convert to dot-notation
+        // for the OmniRoute user-facing ID (matches MODEL_ALIAS_MAP in windsurf.ts).
+        const models = configs
+          .filter((c) => !c.disabled)
+          .map((c) => {
+            const uid = String(c.modelUid || "");
+            const label = String(c.label || uid);
+            const maxTokens = typeof c.maxTokens === "number" ? c.maxTokens : 200000;
+            return {
+              id: uid,
+              name: label,
+              contextLength: maxTokens,
+              owned_by: provider,
+            };
+          })
+          .filter((m) => m.id);
+
+        if (models.length === 0) {
+          const fallback = buildLocalCatalogResponse("Empty response from Windsurf API");
+          if (fallback) return fallback;
+        }
+
+        // buildApiDiscoveryResponse calls persistDiscoveredModels internally
+        return buildApiDiscoveryResponse(models);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.log(`[models] ${provider}: GetCliModelConfigs error:`, message);
+        const fallback = buildDiscoveryFallbackResponse({
+          cacheWarning: `Windsurf API unavailable (${message}) — using cached catalog`,
+          localWarning: `Windsurf API unavailable (${message}) — using local catalog`,
+        });
+        if (fallback) return fallback;
+        return NextResponse.json(
+          { error: `Failed to fetch ${provider} models: ${message}` },
+          { status: 502 }
+        );
+      }
+    }
+
     if (provider === "glm" || provider === "glm-cn" || provider === "glmt") {
       const cachedResponse = maybeReturnCachedDiscovery();
       if (cachedResponse) return cachedResponse;
